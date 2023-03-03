@@ -6,7 +6,7 @@
             name="viewport"
             content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
         />
-        <title>Snake</title>
+        <title>Solar System</title>
 
         <style>
             body,
@@ -15,7 +15,6 @@
                 height: 100%;
                 margin: 0;
                 padding: 0;
-                background-color: gray;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -26,16 +25,6 @@
                 padding: 0;
             }
         </style>
-        <script>
-            // immediately focus on the canvas so that the user can start playing
-
-            window.addEventListener("load", () => {
-                document.querySelector("canvas").focus();
-            });
-            document.addEventListener("click", () => {
-                document.querySelector("canvas").focus();
-            });
-        </script>
 
         <base data-trunk-public-url />
     </head>
@@ -45,7 +34,7 @@
             rel="rust"
             href="Cargo.toml"
             data-wasm-opt="z"
-            data-bin="snake"
+            data-bin="solar-system"
         />
     </body>
 </html>
