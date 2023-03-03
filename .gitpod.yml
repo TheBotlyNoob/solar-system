@@ -5,10 +5,9 @@
 # Learn more from ready-to-use templates: https://www.gitpod.io/docs/introduction/getting-started/quickstart
 
 tasks:
-  - init: sudo apt update && sudo apt-get install -y g++ pkg-config libx11-dev libasound2-dev libudev-dev && cargo build
-    command: cargo watch -x run
+  - init: cargo install --locked trunk && trunk build
+    command: trunk serve
 
-image: gitpod/workspace-full-vnc
 ports:
-  - port: 6080
+  - port: 8080
     onOpen: open-preview
