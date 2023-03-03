@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use smooth_bevy_cameras::{LookTransform, LookTransformBundle, LookTransformPlugin, Smoother};
 use tracing::info;
 
 fn main() {
@@ -55,21 +56,23 @@ fn setup(
         ..default()
     });
     // camera
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ..default()
+    commands.spawn(LookTransformBundle {
+        transform: LookTransform::new(Vec3::ZERO, Vec3::Y),
+        smoother: Smoother::new(0.9), // Value between 0.0 and 1.0, higher is smoother.
     });
+    commands.spawn(Camera3dBundle::default());
 }
 
-fn move_camera(input: Res<Input<KeyCode>>, mut cams: Query<&mut Transform, With<Camera3d>>) {
-    let (x, y, z) = if input.pressed(KeyCode::W) || input.pressed(KeyCode::Up) {
-        (0., 0.05, 0.)
+fn move_camera(input: Res<Input<KeyCode>>, mut cams: Query<&mut LookTransform>) {
+    let (mut x, mut y, mut z) = (0., 0., 0.);
+    if input.pressed(KeyCode::W) || input.pressed(KeyCode::Up) {
+        y += 0.5;
     } else if input.pressed(KeyCode::S) || input.pressed(KeyCode::Down) {
-        (0., -0.05, 0.)
+        y -= 0.5;
     } else if input.pressed(KeyCode::D) || input.pressed(KeyCode::Right) {
-        (0.05, 0., 0.)
+        x += 0.5;
     } else if input.pressed(KeyCode::A) || input.pressed(KeyCode::Right) {
-        (-0.05, 0., 0.)
+        x -= 0.5;
     } else {
         return;
     };
