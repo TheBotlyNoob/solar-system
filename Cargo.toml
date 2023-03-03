@@ -15,7 +15,6 @@ bevy = { version = "0.9", default-features = false, features = [
     "filesystem_watcher",
 ] }
 bevy_framepace = "0.11"
-smooth-bevy-cameras = "0.7.0"
 tracing = "0.1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

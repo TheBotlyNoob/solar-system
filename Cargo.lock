@@ -2096,23 +2096,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "smooth-bevy-cameras"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8e7abff06ee579858c7b6c9c134af62566dd62e442ca79038d8a1fe50aaf335"
-dependencies = [
- "approx",
- "bevy",
- "serde",
-]
-
-[[package]]
 name = "solar-system"
 version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_framepace",
- "smooth-bevy-cameras",
  "tracing",
  "web-sys",
 ]
