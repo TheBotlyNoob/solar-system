@@ -11,10 +11,11 @@ bevy = { version = "0.9", default-features = false, features = [
     "bevy_asset",
     "bevy_winit",
     "render",
+    "jpeg",
     "x11",
     "filesystem_watcher",
 ] }
-bevy-inspector-egui = "0.17.0"
+bevy_editor_pls = "0.2"
 bevy_framepace = "0.11"
 tracing = "0.1"
 
