@@ -14,6 +14,7 @@ bevy = { version = "0.9", default-features = false, features = [
     "x11",
     "filesystem_watcher",
 ] }
+bevy-inspector-egui = "0.17.0"
 bevy_framepace = "0.11"
 tracing = "0.1"
 

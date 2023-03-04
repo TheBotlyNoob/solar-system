@@ -1,23 +1,32 @@
-use bevy::prelude::*;
+use bevy::{
+    core_pipeline::{bloom::BloomSettings, fxaa},
+    prelude::*,
+};
 
 fn main() {
     let mut app = App::new();
 
-    app.insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            window: {
-                WindowDescriptor {
-                    title: "Solar System".to_string(),
-                    fit_canvas_to_parent: true,
+    app.insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)));
 
-                    ..default()
-                }
-            },
-            ..default()
-        }))
-        .add_plugin(bevy_framepace::FramepacePlugin)
-        .add_startup_system(setup)
-        .add_system(move_camera);
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        window: {
+            WindowDescriptor {
+                title: "Solar System".to_string(),
+                fit_canvas_to_parent: true,
+
+                ..default()
+            }
+        },
+        ..default()
+    }))
+    .add_plugin(bevy_framepace::FramepacePlugin);
+
+    app.add_startup_system(setup);
+
+    app.add_system(move_camera);
+
+    #[cfg(debug_assertions)]
+    app.add_plugin(bevy_inspector_egui::quick::WorldInspectorPlugin);
 
     app.run()
 }
@@ -30,34 +39,59 @@ fn setup(
 ) {
     framepace_settings.limiter = bevy_framepace::Limiter::from_framerate(60.0);
 
-    // plane
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 5.0 })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-        ..default()
-    });
-    // cube
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-        material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-        transform: Transform::from_xyz(0.0, 0.5, 0.0),
-        ..default()
-    });
-    // light
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 1500.0,
-            shadows_enabled: true,
+    // sphere light
+    commands
+        .spawn(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::UVSphere {
+                sectors: 128,
+                stacks: 64,
+                radius: 1.0,
+
+                ..default()
+            })),
+            material: materials.add(StandardMaterial {
+                base_color: Color::YELLOW,
+                emissive: Color::YELLOW,
+                ..default()
+            }),
+            transform: Transform::from_xyz(0., 0.6, 0.0).with_scale(Vec3::splat(0.1)),
             ..default()
-        },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
-        ..default()
-    });
+        })
+        .with_children(|children| {
+            children.spawn(PointLightBundle {
+                point_light: PointLight {
+                    intensity: 1500.0,
+                    radius: 0.1,
+                    color: Color::rgb(0.2, 0.2, 1.0),
+                    ..default()
+                },
+                ..default()
+            });
+        });
+
     // camera
     commands.spawn(Camera3dBundle {
+        camera: Camera {
+            hdr: true,
+            ..default()
+        },
         transform: Transform::from_xyz(-1.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
+
+    // post processing
+    commands.spawn((
+        BloomSettings {
+            intensity: 100.0,
+
+            ..default()
+        },
+        fxaa::Fxaa {
+            enabled: true,
+            edge_threshold: fxaa::Sensitivity::High,
+            ..default()
+        },
+    ));
 }
 
 fn move_camera(input: Res<Input<KeyCode>>, mut cams: Query<&mut Transform, With<Camera3d>>) {
