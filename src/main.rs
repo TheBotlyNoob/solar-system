@@ -3,9 +3,12 @@
 
 use bevy::{
     core_pipeline::{bloom::BloomSettings, fxaa::Fxaa},
-    input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
     prelude::*,
     window::CursorGrabMode,
+};
+use smooth_bevy_cameras::{
+    controllers::orbit::{OrbitCameraBundle, OrbitCameraPlugin},
+    LookTransformPlugin,
 };
 
 enum Planet {
@@ -91,29 +94,25 @@ fn main() {
             ..Default::default()
         });
 
+    #[cfg(target_arch = "wasm32")]
+    app.insert_resource(Msaa { samples: 1 });
+
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         window: {
             WindowDescriptor {
                 title: "Solar System".to_string(),
                 fit_canvas_to_parent: true,
-                cursor_grab_mode: CursorGrabMode::Confined,
-                cursor_visible: false,
 
                 ..default()
             }
         },
         ..default()
     }))
+    .add_plugin(LookTransformPlugin)
+    .add_plugin(OrbitCameraPlugin::default())
     .add_plugin(bevy_framepace::FramepacePlugin);
-    // #[cfg(debug_assertions)]
-    // app.add_plugin(bevy_editor_pls::EditorPlugin);
 
     app.add_startup_system(setup);
-
-    app.add_system(mouse_scroll)
-        .add_system(mouse_movement)
-        .add_system(keyboard_movement)
-        .add_system(move_camera.after(mouse_scroll).after(keyboard_movement));
 
     app.run()
 }
@@ -127,41 +126,40 @@ fn setup(
 ) {
     framepace_settings.limiter = bevy_framepace::Limiter::from_framerate(60.0);
 
-    commands.spawn((
-        Camera3dBundle {
+    commands
+        .spawn(Camera3dBundle {
             camera: Camera {
                 hdr: true, // 1. HDR must be enabled on the camera
                 ..default()
             },
-            transform: Transform::from_xyz(0.0, -500.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
-        },
+        })
+        .insert(OrbitCameraBundle::new(
+            default(),
+            Vec3::new(0.0, 500.0, 0.0),
+            Vec3::ZERO,
+            Vec3::Y,
+        ));
+
+    // post-processing
+    commands.spawn((
         BloomSettings {
             intensity: 1.0,
-            knee: 0.5,
             ..default()
         }, // 2. Enable bloom for the camera
         Fxaa {
-            edge_threshold: bevy::core_pipeline::fxaa::Sensitivity::High,
+            edge_threshold: bevy::core_pipeline::fxaa::Sensitivity::Ultra,
             ..default()
         },
     ));
-
-    // plane for debugging
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 100.0 })),
-        material: materials.add(Color::rgb(0.5, 0.5, 0.5).into()),
-        transform: Transform::from_xyz(0.0, -1.0, 0.0),
-        ..default()
-    });
 
     // sun
     let sun_texture = asset_server.load::<Image, _>("planets/sun.jpg");
     commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::UVSphere {
             radius: 100.0,
-
-            ..default()
+            sectors: 64,
+            stacks: 64,
         })),
         material: materials.add(StandardMaterial {
             emissive: Color::rgb_linear(500.0, 500.0, 500.0),
@@ -173,60 +171,4 @@ fn setup(
         transform: Transform::from_xyz(0.0, 0.0, 0.0),
         ..default()
     });
-}
-
-fn mouse_scroll(mut movement: ResMut<Movement>, mut input: EventReader<MouseWheel>) {
-    let mut delta = Vec3::ZERO;
-
-    for event in input.iter() {
-        match event.unit {
-            MouseScrollUnit::Line => {
-                delta.x -= event.y * 10.0;
-            }
-            MouseScrollUnit::Pixel => {
-                delta.x -= event.y;
-            }
-        }
-    }
-
-    movement.0.translation += delta;
-}
-
-fn mouse_movement(mut movement: ResMut<Movement>, mut input: EventReader<MouseMotion>) {
-    // make movement look where the mouse is pointing
-    let mut delta = Vec2::ZERO;
-
-    for event in input.iter() {
-        delta -= event.delta;
-    }
-
-    delta /= 4.0;
-
-    movement.0.rotate_x(delta.x.to_radians());
-    movement.0.rotate_y(delta.y.to_radians());
-}
-
-fn keyboard_movement(mut movement: ResMut<Movement>, keyboard_input: Res<Input<KeyCode>>) {
-    let mut delta = Vec3::ZERO;
-
-    if keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up) {
-        delta.y += 3.0;
-    }
-    if keyboard_input.pressed(KeyCode::S) || keyboard_input.pressed(KeyCode::Down) {
-        delta.y -= 3.0;
-    }
-    if keyboard_input.pressed(KeyCode::A) || keyboard_input.pressed(KeyCode::Left) {
-        delta.z += 3.0;
-    }
-    if keyboard_input.pressed(KeyCode::D) || keyboard_input.pressed(KeyCode::Right) {
-        delta.z -= 3.0;
-    }
-
-    movement.0.translation += delta;
-}
-
-fn move_camera(movement: ResMut<Movement>, mut cams: Query<&mut Transform, With<Camera>>) {
-    for mut transform in &mut cams {
-        *transform = movement.0;
-    }
 }
