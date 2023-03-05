@@ -2,7 +2,10 @@
 #![allow(dead_code)]
 
 use bevy::{
-    core_pipeline::{bloom::BloomSettings, fxaa::Fxaa},
+    core_pipeline::{
+        bloom::BloomSettings,
+        fxaa::{Fxaa, Sensitivity},
+    },
     input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
     prelude::*,
 };
@@ -65,31 +68,30 @@ fn setup(
     framepace_settings.limiter = bevy_framepace::Limiter::from_framerate(60.0);
 
     commands
-        .spawn(Camera3dBundle {
-            camera: Camera {
-                hdr: true, // 1. HDR must be enabled on the camera
+        .spawn((
+            Camera3dBundle {
+                camera: Camera {
+                    hdr: true, // 1. HDR must be enabled on the camera
+                    ..default()
+                },
                 ..default()
             },
-            ..default()
-        })
+            BloomSettings {
+                scale: 2.5,
+
+                ..default()
+            }, // 2. Enable bloom for the camera
+            Fxaa {
+                edge_threshold: Sensitivity::High,
+                ..default()
+            },
+        ))
         .insert(OrbitCameraBundle::new(
             default(),
-            Vec3::new(0.0, 500.0, 0.0),
+            Vec3::new(0.0, 1_000.0, 0.0),
             Vec3::ZERO,
             Vec3::Y,
         ));
-
-    // post-processing
-    commands.spawn((
-        BloomSettings {
-            intensity: 1.0,
-            ..default()
-        }, // 2. Enable bloom for the camera
-        Fxaa {
-            edge_threshold: bevy::core_pipeline::fxaa::Sensitivity::Ultra,
-            ..default()
-        },
-    ));
 
     // sun
     let sun_texture = asset_server.load::<Image, _>("planets/sun.jpg");
@@ -100,7 +102,7 @@ fn setup(
             stacks: 64,
         })),
         material: materials.add(StandardMaterial {
-            emissive: Color::rgb_linear(500.0, 500.0, 500.0),
+            emissive: Color::rgb_linear(250.0, 250.0, 250.0),
             emissive_texture: Some(sun_texture.clone()),
             base_color_texture: Some(sun_texture),
             ..default()
