@@ -64,8 +64,8 @@ impl Planet {
     }
     /// The scale of the planet relative to the Sun.
     /// The Sun has a radius of 695,700 km.
-    pub fn scale(&self) -> f32 {
-        self.radius() / 6_957.0
+    pub fn scaled_radius(&self) -> f32 {
+        self.radius() / 6.957 // TODO: make this more accurate, without hindering the user experience
     }
 
     /// The distance from the Sun.
