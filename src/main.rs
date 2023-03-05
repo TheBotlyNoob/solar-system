@@ -3,83 +3,17 @@
 
 use bevy::{
     core_pipeline::{bloom::BloomSettings, fxaa::Fxaa},
+    input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
     prelude::*,
-    window::CursorGrabMode,
 };
 use smooth_bevy_cameras::{
-    controllers::orbit::{OrbitCameraBundle, OrbitCameraPlugin},
+    controllers::orbit::{
+        ControlEvent, OrbitCameraBundle, OrbitCameraController, OrbitCameraPlugin,
+    },
     LookTransformPlugin,
 };
 
-enum Planet {
-    Sun,
-    Mercury,
-    Venus,
-    Earth,
-    Mars,
-    Jupiter,
-    Saturn,
-    Uranus,
-    Neptune,
-    Pluto,
-}
-
-impl Planet {
-    /// The radius of the planet in kilometers.
-    fn radius(&self) -> f32 {
-        match self {
-            Planet::Sun => 695_700.0,
-            Planet::Mercury => 2_439.7,
-            Planet::Venus => 6_051.8,
-            Planet::Earth => 6_371.0,
-            Planet::Mars => 3_389.5,
-            Planet::Jupiter => 69_911.0,
-            Planet::Saturn => 58_232.0,
-            Planet::Uranus => 25_362.0,
-            Planet::Neptune => 24_622.0,
-            Planet::Pluto => 1_188.0,
-        }
-    }
-    /// The average distance from the sun in kilometers.
-    fn distance(&self) -> f32 {
-        match self {
-            Planet::Sun => 0.0,
-            Planet::Mercury => 57_909_175.0,
-            Planet::Venus => 108_208_930.0,
-            Planet::Earth => 149_597_890.0,
-            Planet::Mars => 227_936_640.0,
-            Planet::Jupiter => 778_412_020.0,
-            Planet::Saturn => 1_426_725_400.0,
-            Planet::Uranus => 2_870_972_200.0,
-            Planet::Neptune => 4_498_252_900.0,
-            Planet::Pluto => 5_906_370_000.0,
-        }
-    }
-    /// The speed that the planet orbits the Sun in kilometers/hour.
-    /// A positive value means the planet orbits clockwise.
-    /// A negative value means the planet orbits counter-clockwise.
-    /// A value of 0 means the planet does not orbit.
-    /// https://en.wikipedia.org/wiki/Orbital_speed
-    fn speed(&self) -> f32 {
-        match self {
-            Planet::Sun => 0.0,
-            Planet::Mercury => 47_872.0,
-            Planet::Venus => 35_021.0,
-            Planet::Earth => 29_783.0,
-            Planet::Mars => 24_077.0,
-            Planet::Jupiter => 13_069.0,
-            Planet::Saturn => 9_672.0,
-            Planet::Uranus => 6_835.0,
-            Planet::Neptune => 5_477.0,
-            Planet::Pluto => 4_736.0,
-        }
-    }
-    /// The scale of the planet relative to the Sun.
-    /// The Sun has a radius of 695,700 km.
-    fn scale(&self) -> f32 {
-        self.radius() / 6_957.0
-    }
-}
+mod planets;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Reflect, Resource)]
 struct Movement(Transform);
@@ -109,10 +43,14 @@ fn main() {
         ..default()
     }))
     .add_plugin(LookTransformPlugin)
-    .add_plugin(OrbitCameraPlugin::default())
+    .add_plugin(OrbitCameraPlugin {
+        override_input_system: true,
+    })
     .add_plugin(bevy_framepace::FramepacePlugin);
 
     app.add_startup_system(setup);
+
+    app.add_system(orbit_controller);
 
     app.run()
 }
@@ -165,10 +103,60 @@ fn setup(
             emissive: Color::rgb_linear(500.0, 500.0, 500.0),
             emissive_texture: Some(sun_texture.clone()),
             base_color_texture: Some(sun_texture),
-
             ..default()
         }),
         transform: Transform::from_xyz(0.0, 0.0, 0.0),
         ..default()
     });
+}
+
+fn orbit_controller(
+    mut events: EventWriter<ControlEvent>,
+    mut mouse_wheel_reader: EventReader<MouseWheel>,
+    mut mouse_motion_events: EventReader<MouseMotion>,
+    mouse_buttons: Res<Input<MouseButton>>,
+    keyboard: Res<Input<KeyCode>>,
+    controllers: Query<&OrbitCameraController>,
+) {
+    // Can only control one camera at a time.
+    let controller = if let Some(controller) = controllers.iter().find(|c| c.enabled) {
+        controller
+    } else {
+        return;
+    };
+    let OrbitCameraController {
+        mouse_rotate_sensitivity,
+        mouse_translate_sensitivity,
+        mouse_wheel_zoom_sensitivity,
+        pixels_per_line,
+        ..
+    } = *controller;
+
+    let mut cursor_delta = Vec2::ZERO;
+    for event in mouse_motion_events.iter() {
+        cursor_delta += event.delta;
+    }
+
+    if keyboard.pressed(KeyCode::LControl) {
+        events.send(ControlEvent::TranslateTarget(
+            mouse_rotate_sensitivity * cursor_delta * 100.0,
+        ));
+    }
+
+    if mouse_buttons.pressed(MouseButton::Right) {
+        events.send(ControlEvent::Orbit(
+            mouse_translate_sensitivity * cursor_delta,
+        ));
+    }
+
+    let mut scalar = 1.0;
+    for event in mouse_wheel_reader.iter() {
+        // scale the event magnitude per pixel or per line
+        let scroll_amount = match event.unit {
+            MouseScrollUnit::Line => event.y,
+            MouseScrollUnit::Pixel => event.y / pixels_per_line,
+        };
+        scalar *= 1.0 - scroll_amount * mouse_wheel_zoom_sensitivity;
+    }
+    events.send(ControlEvent::Zoom(scalar));
 }
