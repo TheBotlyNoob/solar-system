@@ -9,6 +9,7 @@ use bevy::{
     input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
     prelude::*,
 };
+use planets::Planet;
 use smooth_bevy_cameras::{
     controllers::orbit::{
         ControlEvent, OrbitCameraBundle, OrbitCameraController, OrbitCameraPlugin,
@@ -71,16 +72,12 @@ fn setup(
         .spawn((
             Camera3dBundle {
                 camera: Camera {
-                    hdr: true, // 1. HDR must be enabled on the camera
+                    hdr: true,
                     ..default()
                 },
                 ..default()
             },
-            BloomSettings {
-                scale: 2.5,
-
-                ..default()
-            }, // 2. Enable bloom for the camera
+            BloomSettings::default(),
             Fxaa {
                 edge_threshold: Sensitivity::High,
                 ..default()
@@ -95,19 +92,54 @@ fn setup(
 
     // sun
     let sun_texture = asset_server.load::<Image, _>("planets/sun.jpg");
+    commands
+        .spawn(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::UVSphere {
+                radius: 100.0,
+                sectors: 64,
+                stacks: 64,
+            })),
+            material: materials.add(StandardMaterial {
+                emissive: Color::rgb_linear(100.0, 100.0, 100.0),
+                emissive_texture: Some(sun_texture.clone()),
+                base_color_texture: Some(sun_texture),
+                ..default()
+            }),
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            ..default()
+        })
+        .with_children(|children| {
+            children.spawn(PointLightBundle {
+                point_light: PointLight {
+                    color: Color::rgb_linear(250.0, 250.0, 250.0),
+                    intensity: 100_000.0,
+                    range: 100_000.0,
+                    ..default()
+                },
+                transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                ..default()
+            });
+        });
+
+    // planets
+    // mercury
+    println!(
+        "mercury: {} km - scaled: {}",
+        Planet::Mercury.distance(),
+        Planet::Mercury.scaled_distance()
+    );
+    let mercury_texture = asset_server.load::<Image, _>("planets/mercury.jpg");
     commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::UVSphere {
-            radius: 100.0,
+            radius: Planet::Mercury.scale(),
             sectors: 64,
             stacks: 64,
         })),
         material: materials.add(StandardMaterial {
-            emissive: Color::rgb_linear(250.0, 250.0, 250.0),
-            emissive_texture: Some(sun_texture.clone()),
-            base_color_texture: Some(sun_texture),
+            base_color_texture: Some(mercury_texture),
             ..default()
         }),
-        transform: Transform::from_xyz(0.0, 0.0, 0.0),
+        transform: Transform::from_xyz(0.0, 500.0, 0.0),
         ..default()
     });
 }

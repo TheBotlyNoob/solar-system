@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Planet {
     Sun,
     Mercury,
@@ -27,19 +28,19 @@ impl Planet {
             Planet::Pluto => 1_188.0,
         }
     }
-    /// The average distance from the sun in kilometers.
+    /// The average distance from the sun in astronomical units.
     pub fn distance(&self) -> f32 {
         match self {
             Planet::Sun => 0.0,
-            Planet::Mercury => 57_909_175.0,
-            Planet::Venus => 108_208_930.0,
-            Planet::Earth => 149_597_890.0,
-            Planet::Mars => 227_936_640.0,
-            Planet::Jupiter => 778_412_020.0,
-            Planet::Saturn => 1_426_725_400.0,
-            Planet::Uranus => 2_870_972_200.0,
-            Planet::Neptune => 4_498_252_900.0,
-            Planet::Pluto => 5_906_370_000.0,
+            Planet::Mercury => 0.387,
+            Planet::Venus => 0.723,
+            Planet::Earth => 1.0,
+            Planet::Mars => 1.524,
+            Planet::Jupiter => 5.203,
+            Planet::Saturn => 9.539,
+            Planet::Uranus => 19.18,
+            Planet::Neptune => 30.06,
+            Planet::Pluto => 39.53,
         }
     }
     /// The speed that the planet orbits the Sun in kilometers/hour.
@@ -65,5 +66,10 @@ impl Planet {
     /// The Sun has a radius of 695,700 km.
     pub fn scale(&self) -> f32 {
         self.radius() / 6_957.0
+    }
+
+    /// The distance from the Sun.
+    pub fn scaled_distance(&self) -> f32 {
+        self.distance() * 6_957.0
     }
 }
