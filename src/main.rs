@@ -4,7 +4,6 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
     core_pipeline::fxaa::{Fxaa, Sensitivity},
-    ecs::system::EntityCommands,
     input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
     prelude::*,
 };
@@ -63,7 +62,9 @@ fn main() {
 
     app.add_startup_system(setup);
 
-    app.add_system(orbit_controller).add_system(planet_selected);
+    app.add_system(orbit_controller)
+        .add_system(planet_selected)
+        .add_system(planet_orbit);
 
     app.run()
 }
@@ -95,15 +96,49 @@ fn setup(
 
     // planets
     macro_rules! planet {
-        ($name:ident) => {
-            planet(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
-                Planet::$name,
-                asset_server.load(format!("planets/{}.jpg", stringify!($name).to_lowercase())),
-            )
-        };
+        ($name:ident) => {{
+            let planet = Planet::$name;
+            let mesh = Mesh::from(shape::UVSphere {
+                radius: planet.scaled_radius(),
+                sectors: 64,
+                stacks: 64,
+            });
+
+            let mut planet_id = commands.spawn((
+                PbrBundle {
+                    mesh: meshes.add(mesh),
+                    material: materials.add(StandardMaterial {
+                        base_color_texture: Some(
+                            asset_server
+                                .load(format!("planets/{}.jpg", stringify!($name).to_lowercase())),
+                        ),
+                        // not reflective
+                        reflectance: 0.0,
+                        metallic: 0.0,
+                        ..default()
+                    }),
+                    transform: {
+                        let mut t = Transform::from_xyz(planet.scaled_distance(), 0.0, 0.0);
+                        // flip the planet so it's not sideways
+                        t.rotate_x(FRAC_PI_2);
+                        t
+                    },
+                    ..default()
+                },
+                PickableBundle::default(), // <- Makes the mesh pickable.
+            ));
+            planet_id
+                .insert(OutlineBundle {
+                    outline: OutlineVolume {
+                        visible: true,
+                        colour: Color::WHITE,
+                        width: 0.5,
+                    },
+                    ..default()
+                })
+                .insert(planet);
+            planet_id
+        }};
     }
 
     planet!(Sun).with_children(|children| {
@@ -127,52 +162,6 @@ fn setup(
     planet!(Saturn);
     planet!(Uranus);
     planet!(Neptune);
-}
-
-fn planet<'w, 's, 'c>(
-    commands: &'c mut Commands<'w, 's>,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
-    planet: Planet,
-    texture: Handle<Image>,
-) -> EntityCommands<'w, 's, 'c> {
-    let mesh = Mesh::from(shape::UVSphere {
-        radius: planet.scaled_radius(),
-        sectors: 64,
-        stacks: 64,
-    });
-
-    let mut planet_id = commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(mesh),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(texture),
-                // not reflective
-                reflectance: 0.0,
-                metallic: 0.0,
-                ..default()
-            }),
-            transform: {
-                let mut t = Transform::from_xyz(planet.scaled_distance(), 0.0, 0.0);
-                // flip the planet so it's not sideways
-                t.rotate_x(FRAC_PI_2);
-                t
-            },
-            ..default()
-        },
-        PickableBundle::default(), // <- Makes the mesh pickable.
-    ));
-    planet_id
-        .insert(OutlineBundle {
-            outline: OutlineVolume {
-                visible: true,
-                colour: Color::WHITE,
-                width: 0.5,
-            },
-            ..default()
-        })
-        .insert(planet);
-    planet_id
 }
 
 fn orbit_controller(
@@ -218,6 +207,10 @@ fn orbit_controller(
     events.send(ControlEvent::Zoom(scalar));
 }
 
+fn planet_orbit(time: Res<Time>, mut planets: Query<(&mut Transform, &Planet)>) {
+    for (mut transform, planet) in planets.iter_mut() {}
+}
+
 // when a planet is selected, show information about it, zoom in on it, and change the camera's orbit
 fn planet_selected(
     mut events: EventReader<PickingEvent>,
@@ -232,7 +225,7 @@ fn planet_selected(
                 let mut camera = cameras.single_mut();
                 camera.target = transform.translation;
                 camera.eye =
-                    transform.translation + Vec3::new(planet.scaled_radius() * 3.0, 0.0, 0.0);
+                    transform.translation + Vec3::new(0.0, planet.scaled_radius() * 3.0, 0.0);
             }
         }
     }
