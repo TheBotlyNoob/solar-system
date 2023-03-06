@@ -7,13 +7,11 @@ edition = "2021"
 
 [dependencies]
 bevy = { version = "0.9", default-features = false, features = [
-    "animation",
     "bevy_asset",
     "bevy_winit",
     "render",
     "jpeg",
     "x11",
-    "filesystem_watcher",
 ] }
 bevy_framepace = "0.11"
 smooth-bevy-cameras = "0.7.0"

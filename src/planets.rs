@@ -2,7 +2,8 @@ use bevy::prelude::Component;
 
 const ASTRO_UNIT: f32 = 149_597_870.7;
 
-const SUN_RADIUS: f32 = 100.0;
+const GRAV: f32 = 6.674_08e-11;
+const MASS_OF_SUN: f32 = 1.989_1e30;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Component)]
 pub enum Planet {
@@ -51,31 +52,28 @@ impl Planet {
         }
     }
 
-    /// The average orbital speed in kilometers per second.
-    /// This is the speed at which the planet would travel if it were in a circular orbit.
-    /// The actual speed of the planet is affected by its distance from the Sun.
-    /// The speed is calculated using the formula: `sqrt(G * M / r)`.
-    /// Where `G` is the gravitational constant, `M` is the mass of the Sun, and `r` is the distance from the Sun.
-    pub fn orbital_speed(&self) -> f32 {
-        // thx copilot :)
-        const GRAV: f32 = 6.674_08e-11;
-        const MASS_OF_SUN: f32 = 1.989_1e30;
-        let distance_from_sun = self.distance() * ASTRO_UNIT;
-        (GRAV * MASS_OF_SUN / distance_from_sun).sqrt()
+    /// The average orbital velocity in meters per second.
+    pub fn orbital_velocity(&self) -> f32 {
+        if *self == Self::Sun {
+            return 0.0;
+        }
+
+        let distance_from_sun = self.distance() * Self::Sun.radius() * ASTRO_UNIT + self.radius();
+        (GRAV * MASS_OF_SUN / distance_from_sun).sqrt() / 10_000.0
     }
 
     /// The scale of the planet relative to the Sun.
     /// The Sun has a radius of 695,700 km.
     pub fn scaled_radius(&self) -> f32 {
         if *self == Self::Sun {
-            SUN_RADIUS
+            self.radius() / 100.0
         } else {
-            self.radius() / ASTRO_UNIT * (Self::Sun.radius() / SUN_RADIUS)
+            self.radius() / (Self::Sun.radius() / 100_000.0) // just make it a bit bigger
         }
     }
 
     /// The distance from the Sun.
     pub fn scaled_distance(&self) -> f32 {
-        self.distance() * (Self::Sun.radius() / SUN_RADIUS * 2.0)
+        self.distance() * (Self::Sun.radius() / 10.0)
     }
 }
