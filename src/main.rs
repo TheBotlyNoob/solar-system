@@ -26,6 +26,8 @@ mod planets;
 struct Movement(Transform);
 
 fn main() {
+    info!("Starting Solar System...");
+
     let mut app = App::new();
 
     app.insert_resource(ClearColor(Color::BLACK))
@@ -94,15 +96,12 @@ fn setup(
     // planets
     macro_rules! planet {
         ($name:ident) => {
-            planet!($name, stringify!($name).to_lowercase())
-        };
-        ($name:ident, $filename:expr) => {
             planet(
                 &mut commands,
                 &mut meshes,
                 &mut materials,
                 Planet::$name,
-                asset_server.load::<Image, _>(format!("planets/{}.jpg", $filename)),
+                asset_server.load(format!("planets/{}.jpg", stringify!($name).to_lowercase())),
             )
         };
     }
@@ -122,7 +121,7 @@ fn setup(
 
     planet!(Mercury);
     planet!(Venus);
-    planet!(Earth, "earth_day");
+    planet!(Earth);
     planet!(Mars);
     planet!(Jupiter);
     planet!(Saturn);
