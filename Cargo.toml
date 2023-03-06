@@ -29,7 +29,7 @@ web-sys = { version = "0.3", features = ["Window"] }
 lto = true
 codegen-units = 1
 opt-level = "z"
-strip = true
+# strip = true
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]
