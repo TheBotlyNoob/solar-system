@@ -18,7 +18,8 @@ bevy = { version = "0.9", default-features = false, features = [
 bevy_framepace = "0.11"
 smooth-bevy-cameras = "0.7.0"
 tracing = "0.1"
-bevy_mod_outline = "0.3"
+bevy_mod_outline = { git = "https://github.com/komadori/bevy_mod_outline", ref = "5f06c32" }
+bevy_mod_picking = "0.11.0"
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

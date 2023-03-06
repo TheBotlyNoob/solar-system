@@ -1,5 +1,6 @@
 #![warn(clippy::all)]
-#![allow(dead_code)]
+
+use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
     core_pipeline::fxaa::{Fxaa, Sensitivity},
@@ -8,12 +9,15 @@ use bevy::{
     prelude::*,
 };
 use bevy_mod_outline::{OutlineBundle, OutlinePlugin, OutlineVolume};
+use bevy_mod_picking::{
+    InteractablePickingPlugin, PickableBundle, PickingCameraBundle, PickingEvent, PickingPlugin,
+};
 use planets::Planet;
 use smooth_bevy_cameras::{
     controllers::orbit::{
         ControlEvent, OrbitCameraBundle, OrbitCameraController, OrbitCameraPlugin,
     },
-    LookTransformPlugin,
+    LookTransform, LookTransformPlugin,
 };
 
 mod planets;
@@ -44,17 +48,20 @@ fn main() {
             }
         },
         ..default()
-    }))
-    .add_plugin(LookTransformPlugin)
-    .add_plugin(OrbitCameraPlugin {
-        override_input_system: true,
-    })
-    .add_plugin(bevy_framepace::FramepacePlugin)
-    .add_plugin(OutlinePlugin);
+    }));
+
+    app.add_plugin(LookTransformPlugin)
+        .add_plugin(OrbitCameraPlugin {
+            override_input_system: true,
+        })
+        .add_plugin(bevy_framepace::FramepacePlugin)
+        .add_plugin(OutlinePlugin)
+        .add_plugin(PickingPlugin)
+        .add_plugin(InteractablePickingPlugin);
 
     app.add_startup_system(setup);
 
-    app.add_system(orbit_controller);
+    app.add_system(orbit_controller).add_system(planet_selected);
 
     app.run()
 }
@@ -70,14 +77,8 @@ fn setup(
 
     commands
         .spawn((
-            Camera3dBundle {
-                camera: Camera {
-                    // hdr: true,
-                    ..default()
-                },
-                ..default()
-            },
-            // BloomSettings::default(),
+            Camera3dBundle::default(),
+            PickingCameraBundle::default(), // <- Sets the camera to use for picking.
             Fxaa {
                 edge_threshold: Sensitivity::High,
                 ..default()
@@ -90,41 +91,10 @@ fn setup(
             Vec3::Y,
         ));
 
-    // sun
-    let sun_texture = asset_server.load::<Image, _>("planets/sun.jpg");
-    commands
-        .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::UVSphere {
-                radius: 100.0,
-                sectors: 64,
-                stacks: 64,
-            })),
-            material: materials.add(StandardMaterial {
-                emissive: Color::rgb_linear(100.0, 100.0, 100.0),
-                emissive_texture: Some(sun_texture.clone()),
-                base_color_texture: Some(sun_texture),
-                ..default()
-            }),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            ..default()
-        })
-        .with_children(|children| {
-            children.spawn(PointLightBundle {
-                point_light: PointLight {
-                    color: Color::rgb_linear(250.0, 250.0, 250.0),
-                    intensity: 100_000.0,
-                    range: 100_000.0,
-                    ..default()
-                },
-                transform: Transform::from_xyz(0.0, 0.0, 0.0),
-                ..default()
-            });
-        });
-
     // planets
     macro_rules! planet {
         ($name:ident) => {
-            planet!($name, stringify!($name).to_lowercase());
+            planet!($name, stringify!($name).to_lowercase())
         };
         ($name:ident, $filename:expr) => {
             planet(
@@ -133,9 +103,23 @@ fn setup(
                 &mut materials,
                 Planet::$name,
                 asset_server.load::<Image, _>(format!("planets/{}.jpg", $filename)),
-            );
+            )
         };
     }
+
+    planet!(Sun).with_children(|children| {
+        children.spawn(PointLightBundle {
+            point_light: PointLight {
+                color: Color::rgb_linear(250.0, 250.0, 250.0),
+                intensity: 100_000.0,
+                range: 100_000.0,
+                ..default()
+            },
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            ..default()
+        });
+    });
+
     planet!(Mercury);
     planet!(Venus);
     planet!(Earth, "earth_day");
@@ -159,24 +143,37 @@ fn planet<'w, 's, 'c>(
         stacks: 64,
     });
 
-    let mut planet = commands.spawn(PbrBundle {
-        mesh: meshes.add(mesh),
-        material: materials.add(StandardMaterial {
-            base_color_texture: Some(texture),
+    let mut planet_id = commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(mesh),
+            material: materials.add(StandardMaterial {
+                base_color_texture: Some(texture),
+                // not reflective
+                reflectance: 0.0,
+                metallic: 0.0,
+                ..default()
+            }),
+            transform: {
+                let mut t = Transform::from_xyz(planet.scaled_distance(), 0.0, 0.0);
+                // flip the planet so it's not sideways
+                t.rotate_x(FRAC_PI_2);
+                t
+            },
             ..default()
-        }),
-        transform: Transform::from_xyz(planet.scaled_distance(), 0.0, 0.0),
-        ..default()
-    });
-    planet.insert(OutlineBundle {
-        outline: OutlineVolume {
-            visible: true,
-            colour: Color::WHITE,
-            width: 0.5,
         },
-        ..default()
-    });
-    planet
+        PickableBundle::default(), // <- Makes the mesh pickable.
+    ));
+    planet_id
+        .insert(OutlineBundle {
+            outline: OutlineVolume {
+                visible: true,
+                colour: Color::WHITE,
+                width: 0.5,
+            },
+            ..default()
+        })
+        .insert(planet);
+    planet_id
 }
 
 fn orbit_controller(
@@ -220,4 +217,24 @@ fn orbit_controller(
         scalar *= 1.0 - scroll_amount * mouse_wheel_zoom_sensitivity;
     }
     events.send(ControlEvent::Zoom(scalar));
+}
+
+// when a planet is selected, show information about it, zoom in on it, and change the camera's orbit
+fn planet_selected(
+    mut events: EventReader<PickingEvent>,
+    mut cameras: Query<&mut LookTransform, With<OrbitCameraController>>,
+    planets: Query<(&Planet, &Transform)>,
+) {
+    for event in events.iter() {
+        if let PickingEvent::Selection(bevy_mod_picking::SelectionEvent::JustSelected(entity)) =
+            event
+        {
+            if let Ok((planet, transform)) = planets.get(*entity) {
+                let mut camera = cameras.single_mut();
+                camera.target = transform.translation;
+                camera.eye =
+                    transform.translation + Vec3::new(planet.scaled_radius() * 3.0, 0.0, 0.0);
+            }
+        }
+    }
 }

@@ -471,13 +471,31 @@ dependencies = [
 [[package]]
 name = "bevy_mod_outline"
 version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69438c396610035753f613924aee4e725b6aae7f7b380b9bcab39824921d913c"
+source = "git+https://github.com/komadori/bevy_mod_outline#5f06c32bcf87ec21e9da56a915e879f6a092d1a4"
 dependencies = [
  "bevy",
  "bitfield",
  "interpolation",
  "thiserror",
+]
+
+[[package]]
+name = "bevy_mod_picking"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0eb0a57d5c1ea9738b6858bb6206454b2d99265983b36ca82e5a2a0b5c9e7a1"
+dependencies = [
+ "bevy",
+ "bevy_mod_raycast",
+]
+
+[[package]]
+name = "bevy_mod_raycast"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a5813c0224e31350919e5fbf5a2099c3be4c7b8c04e8584ee4dba4e87795a19"
+dependencies = [
+ "bevy",
 ]
 
 [[package]]
@@ -2150,6 +2168,7 @@ dependencies = [
  "bevy",
  "bevy_framepace",
  "bevy_mod_outline",
+ "bevy_mod_picking",
  "smooth-bevy-cameras",
  "tracing",
  "web-sys",

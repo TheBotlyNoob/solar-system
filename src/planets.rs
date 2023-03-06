@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+use bevy::prelude::Component;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Component)]
 pub enum Planet {
     Sun,
     Mercury,
@@ -65,11 +67,11 @@ impl Planet {
     /// The scale of the planet relative to the Sun.
     /// The Sun has a radius of 695,700 km.
     pub fn scaled_radius(&self) -> f32 {
-        self.radius() / 6.957 // TODO: make this more accurate, without hindering the user experience
+        self.radius() / (Self::Sun.radius() / 100.0) // TODO: make this more accurate
     }
 
     /// The distance from the Sun.
     pub fn scaled_distance(&self) -> f32 {
-        self.distance() * 6_957.0
+        self.distance() * (Self::Sun.radius() / 1_000.0)
     }
 }
