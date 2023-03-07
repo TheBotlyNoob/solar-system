@@ -9,6 +9,7 @@ use bevy::{
     },
     prelude::*,
 };
+use bevy_embedded_assets::EmbeddedAssetPlugin;
 use bevy_mod_picking::{
     InteractablePickingPlugin, PickableBundle, PickingCameraBundle, PickingEvent, PickingPlugin,
     SelectionEvent,
@@ -36,17 +37,22 @@ fn main() {
     #[cfg(target_arch = "wasm32")]
     app.insert_resource(Msaa { samples: 1 });
 
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        window: {
-            WindowDescriptor {
-                title: "Solar System".to_string(),
-                fit_canvas_to_parent: true,
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                window: {
+                    WindowDescriptor {
+                        title: "Solar System".to_string(),
+                        fit_canvas_to_parent: true,
 
+                        ..default()
+                    }
+                },
                 ..default()
-            }
-        },
-        ..default()
-    }));
+            })
+            .build()
+            .add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin),
+    );
 
     app.add_plugin(LookTransformPlugin)
         .add_plugin(PickingPlugin)
@@ -88,6 +94,8 @@ fn setup(
                     hdr: true,
                     ..default()
                 },
+                transform: Transform::from_xyz(0.0, 1_000_000.0, 0.0)
+                    .looking_at(Vec3::ZERO, Vec3::Y),
                 ..default()
             },
             #[cfg(not(target_arch = "wasm32"))]
