@@ -68,6 +68,9 @@ fn main() {
         .add_system(escape_event);
 
     #[cfg(debug_assertions)]
+    app.add_system(debug);
+
+    #[cfg(debug_assertions)]
     app.add_plugin(bevy_editor_pls::prelude::EditorPlugin);
 
     app.run()
@@ -89,17 +92,7 @@ fn setup(
             transform: LookTransform::new(Vec3::ONE, Vec3::ZERO, Vec3::Y),
         })
         .insert((
-            Camera3dBundle {
-                camera: Camera {
-                    hdr: true,
-                    ..default()
-                },
-                transform: Transform::from_xyz(0.0, 1_000_000.0, 0.0)
-                    .looking_at(Vec3::ZERO, Vec3::Y),
-                ..default()
-            },
-            #[cfg(not(target_arch = "wasm32"))]
-            BloomSettings::default(),
+            Camera3dBundle::default(),
             PickingCameraBundle::default(), // <- Sets the camera to use for picking.
             Fxaa {
                 edge_threshold: Sensitivity::High,
@@ -181,6 +174,18 @@ fn setup(
     planet!(Saturn);
     planet!(Uranus);
     planet!(Neptune);
+}
+
+/// debug location of the camera and all planets
+#[cfg(debug_assertions)]
+fn debug(planets: Query<(&Planet, &Transform)>, camera: Query<&Transform, With<MainCamera>>) {
+    // print out the location of the camera and all planets
+    for (planet, transform) in planets.iter() {
+        info!("{planet:#?}: {:?}", transform.translation);
+    }
+    for transform in camera.iter() {
+        info!("Camera: {:?}", transform.translation);
+    }
 }
 
 fn planet_orbit(time: Res<Time>, mut planets: Query<(&mut Transform, &Planet)>) {

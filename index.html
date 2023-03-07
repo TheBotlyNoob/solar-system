@@ -27,17 +27,182 @@
         </style>
 
         <script>
-            document.addEventListener("contextmenu", (e) => e.preventDefault());
+            document.addEventListener("DOMContentLoaded", () => {
+                /** 
+                @type {MutationObserver}
+                */
+                let observer;
+                observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.type === "childList") {
+                            mutation.addedNodes.forEach(
+                                (/** @type {Element} */ node) => {
+                                    if (node.tagName === "CANVAS") {
+                                        observer.disconnect();
+                                        document.addEventListener(
+                                            "contextmenu",
+                                            (e) => e.preventDefault()
+                                        );
+                                        document
+                                            .getElementById("spinner")
+                                            .remove();
+                                    }
+                                }
+                            );
+                        }
+                    });
+                });
+                observer.observe(document.body, {
+                    childList: true
+                });
+            });
         </script>
 
         <base data-trunk-public-url />
     </head>
     <body>
+        <div id="spinner">
+            <!-- https://codepen.io/jeremysarda/pen/NRjyyy -->
+
+            <style>
+                body {
+                    background: radial-gradient(
+                            ellipse farthest-corner at center bottom,
+                            #000000 0%,
+                            #060c19 100%
+                        )
+                        center bottom/100% fixed;
+                    text-align: center;
+                    text-transform: uppercase;
+                    box-sizing: border-box;
+                    font-family: sans-serif;
+                    color: rgba(255, 255, 255, 0.8);
+                }
+                body *,
+                body *:before,
+                body *:after {
+                    box-sizing: inherit;
+                }
+
+                .box {
+                    display: inline-block;
+                    width: 100%;
+                    height: 100%;
+                    font-size: 30px;
+                    padding: 5em;
+                    position: relative;
+                    margin-bottom: 0.25em;
+                    vertical-align: top;
+                    transition: 0.3s color, 0.3s border, 0.3s transform,
+                        0.3s opacity;
+                }
+
+                [class*="loader-"] {
+                    display: inline-block;
+                    width: 1em;
+                    height: 1em;
+                    color: inherit;
+                    vertical-align: middle;
+                    pointer-events: none;
+                }
+
+                .loader-17 {
+                    position: relative;
+                    background-color: yellow;
+                    box-shadow: 0 0 100px 25px rgba(255, 255, 51, 0.25);
+                    border-radius: 50%;
+                }
+                .loader-17:after,
+                .loader-17:before {
+                    content: "";
+                    position: absolute;
+                    width: 0.25em;
+                    height: 0.25em;
+                    border-radius: 50%;
+                    opacity: 0.8;
+                }
+                .loader-17:after {
+                    left: -0.5em;
+                    top: -0.25em;
+                    background-color: currentcolor;
+                    transform-origin: 0.75em 1em;
+                    -webkit-animation: loader-17 1s linear infinite;
+                    animation: loader-17 1s linear infinite;
+                    opacity: 0.6;
+                }
+                .loader-17:before {
+                    left: -1.25em;
+                    top: -0.75em;
+                    background-color: currentcolor;
+                    transform-origin: 1.5em 1em;
+                    -webkit-animation: loader-17 2s linear infinite;
+                    animation: loader-17 2s linear infinite;
+                }
+                .loader-17 .loader-17 {
+                    position: relative;
+                    background-color: transparent;
+                    border-radius: 0;
+                    box-shadow: none;
+                }
+                .loader-17 .loader-17:after,
+                .loader-17 .loader-17:before {
+                    content: "";
+                    position: absolute;
+                    width: 0.45em;
+                    height: 0.45em;
+                    border-radius: 50%;
+                    opacity: 0.8;
+                }
+                .loader-17 .loader-17:after {
+                    left: -0.5em;
+                    top: -0.25em;
+                    background-color: currentcolor;
+                    transform-origin: 0.75em 1em;
+                    -webkit-animation: loader-17 1s linear infinite;
+                    animation: loader-17 1s linear infinite;
+                    opacity: 0.6;
+                }
+                .loader-17 .loader-17:before {
+                    left: -1.25em;
+                    top: -0.75em;
+                    background-color: currentcolor;
+                    transform-origin: 1.5em 1em;
+                    -webkit-animation: loader-17 2s linear infinite;
+                    animation: loader-17 2s linear infinite;
+                }
+
+                @-webkit-keyframes loader-17 {
+                    0% {
+                        transform: rotateZ(0deg) translate3d(0, 0, 0);
+                    }
+                    100% {
+                        transform: rotateZ(360deg) translate3d(0, 0, 0);
+                    }
+                }
+
+                @keyframes loader-17 {
+                    0% {
+                        transform: rotateZ(0deg) translate3d(0, 0, 0);
+                    }
+                    100% {
+                        transform: rotateZ(360deg) translate3d(0, 0, 0);
+                    }
+                }
+            </style>
+
+            <div class="box">
+                Loading...<br /><br /><br />
+                <div class="loader-17">
+                    <div class="loader-17"></div>
+                </div>
+            </div>
+        </div>
+
         <link
             data-trunk
             rel="rust"
             href="Cargo.toml"
-            data-wasm-opt="z"
+            data-wasm-opt="4"
             data-bin="solar-system"
         />
         <link data-trunk rel="copy-dir" href="assets" />
