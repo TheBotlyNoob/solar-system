@@ -90,6 +90,7 @@ fn setup(
                 },
                 ..default()
             },
+            #[cfg(not(target_arch = "wasm32"))]
             BloomSettings::default(),
             PickingCameraBundle::default(), // <- Sets the camera to use for picking.
             Fxaa {
