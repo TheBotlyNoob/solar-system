@@ -14,11 +14,10 @@ bevy = { version = "0.9", default-features = false, features = [
     "jpeg",
     "x11",
 ] }
-tracing = "0.1"
-bevy_mod_picking = "0.11.0"
-bevy_editor_pls = "0.2.0"
-smooth-bevy-cameras = "0.7.0"
-bevy_embedded_assets = "0.6.0"
+bevy_mod_picking = "0.11"
+bevy_editor_pls = "0.2"
+bevy_embedded_assets = "0.6"
+bevy_dolly = { git = "https://github.com/BlackPhlox/bevy_dolly", ref = "aae4ce390ec7c2f8e299441a70725ea3b3833fac" }
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

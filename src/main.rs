@@ -6,18 +6,18 @@ use bevy::{
     core_pipeline::fxaa::{Fxaa, Sensitivity},
     prelude::*,
 };
+use bevy_dolly::prelude::*;
 use bevy_embedded_assets::EmbeddedAssetPlugin;
 use bevy_mod_picking::{
     InteractablePickingPlugin, PickableBundle, PickingCameraBundle, PickingEvent, PickingPlugin,
     SelectionEvent,
 };
-use smooth_bevy_cameras::{LookTransform, LookTransformBundle, LookTransformPlugin, Smoother};
 use space::SpaceObject;
 
 mod space;
 
 #[derive(Component)]
-struct CurrentPlanet;
+struct CurrentObject;
 
 #[bevy_main]
 fn main() {
@@ -28,7 +28,6 @@ fn main() {
             brightness: 0.5, // represents the brightness of stars around the solar system
             ..Default::default()
         })
-        .add_event::<MovementEvent>()
         .add_event::<EscapeEvent>();
 
     #[cfg(target_arch = "wasm32")]
@@ -51,19 +50,18 @@ fn main() {
             .add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin),
     );
 
-    app.add_plugin(LookTransformPlugin)
-        .add_plugin(PickingPlugin)
+    app.add_plugin(PickingPlugin)
         .add_plugin(InteractablePickingPlugin);
+
+    app.add_dolly_component(MainCamera);
 
     app.add_startup_system(setup);
 
-    app.add_system(movement_event)
-        .add_system(planet_selected)
+    app.add_system(object_selected)
         .add_system(planet_orbit)
-        .add_system(lock_to_object.after(planet_selected).after(planet_orbit))
+        .add_system(lock_to_object.after(object_selected).after(planet_orbit))
         .add_system(escape)
-        .add_system(escape_event)
-        .add_system(fix_glitch);
+        .add_system(escape_event);
 
     app.add_system_set(
         SystemSet::new()
@@ -85,24 +83,25 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut escape: EventWriter<EscapeEvent>,
 ) {
-    commands
-        .spawn(LookTransformBundle {
-            smoother: Smoother::new(0.8),
-            transform: LookTransform::new(Vec3::ONE, Vec3::ZERO, Vec3::Y),
-        })
-        .insert((
-            Camera3dBundle::default(),
-            PickingCameraBundle::default(), // <- Sets the camera to use for picking.
-            Fxaa {
-                edge_threshold: Sensitivity::High,
-                ..default()
-            },
-        ))
-        .insert(MainCamera);
+    commands.spawn((
+        MainCamera,
+        Rig::builder()
+            .with(Position::new(Vec3::Y * 100_000.0))
+            .with(MovableLookAt::from_position_target(Vec3::ZERO))
+            .with(Smooth::new_position_rotation(0.8, 0.6))
+            .build(),
+    ));
 
-    escape.send(EscapeEvent);
+    commands.spawn((
+        MainCamera,
+        Camera3dBundle::default(),
+        PickingCameraBundle::default(), // <- Sets the camera to use for picking.
+        Fxaa {
+            edge_threshold: Sensitivity::High,
+            ..default()
+        },
+    ));
 
     // planets
     macro_rules! object {
@@ -125,7 +124,7 @@ fn setup(
         ($name:ident, $material:expr, $texture:ident, $has_texture:literal) => {{
             let obj = SpaceObject::$name;
             let mesh = Mesh::from(shape::UVSphere {
-                radius: dbg!(obj.scaled_radius()),
+                radius: obj.scaled_radius(),
                 sectors: 64,
                 stacks: 64,
             });
@@ -147,7 +146,7 @@ fn setup(
                         ..$material
                     }),
                     transform: {
-                        let mut t = Transform::from_xyz(dbg!(obj.scaled_distance()), 0.0, 0.0);
+                        let mut t = Transform::from_xyz(obj.scaled_distance(), 0.0, 0.0);
                         // flip the planet so it's not sideways
                         t.rotate_x(FRAC_PI_2);
                         t
@@ -231,21 +230,6 @@ fn setup(
     object!(Styx, Color::GRAY);
 }
 
-/// fix the camera glitch where the camera gets flinged into oblivion
-/// this is caused by the camera's x and y coordinates being set to absurdly small numbers
-fn fix_glitch(mut camera: Query<(&mut Transform, &mut Smoother), With<MainCamera>>) {
-    for (mut transform, mut smooth) in camera.iter_mut() {
-        if transform.translation.x.abs() < 0.0001 {
-            transform.translation.x = 0.0;
-            smooth.reset();
-        }
-        if transform.translation.y.abs() < 0.0001 {
-            transform.translation.y = 0.0;
-            smooth.reset();
-        }
-    }
-}
-
 /// debug location of the camera
 fn debug(camera: Query<&Transform, With<MainCamera>>) {
     for transform in camera.iter() {
@@ -290,32 +274,30 @@ fn escape(kbd: ResMut<Input<KeyCode>>, mut events: EventWriter<EscapeEvent>) {
 }
 
 // when a planet is selected, show information about it, zoom in on it, and change the camera's orbit
-fn planet_selected(
+fn object_selected(
     mut commands: Commands,
     mut events: EventReader<PickingEvent>,
-    current_planet: Query<Entity, With<CurrentPlanet>>,
+    current_planet: Query<Entity, With<CurrentObject>>,
 ) {
     for event in events.iter() {
         if let PickingEvent::Selection(SelectionEvent::JustSelected(entity)) = event {
             info!(?entity, "Selected planet");
             if let Ok(planet) = current_planet.get_single() {
-                commands.entity(planet).remove::<CurrentPlanet>();
+                commands.entity(planet).remove::<CurrentObject>();
             }
-            commands.entity(*entity).insert(CurrentPlanet);
+            commands.entity(*entity).insert(CurrentObject);
         }
     }
 }
 
 fn lock_to_object(
-    planet: Query<(&SpaceObject, &Transform), With<CurrentPlanet>>,
-    mut movement: EventWriter<MovementEvent>,
+    planet: Query<(&SpaceObject, &Transform), With<CurrentObject>>,
+    mut rig: Query<&mut Rig>,
 ) {
     if let Ok((planet, Transform { translation, .. })) = planet.get_single() {
-        movement.send(MovementEvent(LookTransform::new(
-            *translation - Vec3::new(0.0, 0.0, planet.scaled_radius() * 3.0),
-            *translation,
-            Vec3::Y,
-        )));
+        rig.single_mut()
+            .driver_mut::<MovableLookAt>()
+            .set_position_target(*translation, Quat::IDENTITY);
     }
 }
 
@@ -325,8 +307,8 @@ struct EscapeEvent;
 fn escape_event(
     mut commands: Commands,
     events: EventReader<EscapeEvent>,
-    mut movement: EventWriter<MovementEvent>,
-    mut planet: Query<Entity, With<CurrentPlanet>>,
+    mut rig: Query<&mut Rig>,
+    mut obj: Query<Entity, With<CurrentObject>>,
 ) {
     if events.is_empty() {
         return;
@@ -334,26 +316,11 @@ fn escape_event(
 
     events.clear();
 
-    movement.send(MovementEvent(LookTransform::new(
-        Vec3::new(0.0, 1000.0, 0.0),
-        Vec3::ZERO,
-        Vec3::Y,
-    )));
+    rig.single_mut()
+        .driver_mut::<MovableLookAt>()
+        .set_position_target(Vec3::ZERO, Quat::from_rotation_y(FRAC_PI_2));
 
-    if let Ok(planet) = planet.get_single_mut() {
-        commands.entity(planet).remove::<CurrentPlanet>();
-    }
-}
-
-struct MovementEvent(LookTransform);
-
-fn movement_event(
-    mut events: EventReader<MovementEvent>,
-    mut cameras: Query<&mut LookTransform, With<MainCamera>>,
-) {
-    if let Some(event) = events.iter().last() {
-        let mut camera = cameras.single_mut();
-
-        *camera = event.0;
+    if let Ok(planet) = obj.get_single_mut() {
+        commands.entity(planet).remove::<CurrentObject>();
     }
 }
