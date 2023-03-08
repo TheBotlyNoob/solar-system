@@ -3,10 +3,7 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
-    core_pipeline::{
-        bloom::BloomSettings,
-        fxaa::{Fxaa, Sensitivity},
-    },
+    core_pipeline::fxaa::{Fxaa, Sensitivity},
     prelude::*,
 };
 use bevy_embedded_assets::EmbeddedAssetPlugin;
@@ -14,10 +11,10 @@ use bevy_mod_picking::{
     InteractablePickingPlugin, PickableBundle, PickingCameraBundle, PickingEvent, PickingPlugin,
     SelectionEvent,
 };
-use planets::Planet;
 use smooth_bevy_cameras::{LookTransform, LookTransformBundle, LookTransformPlugin, Smoother};
+use space::SpaceObject;
 
-mod planets;
+mod space;
 
 #[derive(Component)]
 struct CurrentPlanet;
@@ -63,12 +60,16 @@ fn main() {
     app.add_system(movement_event)
         .add_system(planet_selected)
         .add_system(planet_orbit)
-        .add_system(lock_to_planet.after(planet_selected).after(planet_orbit))
+        .add_system(lock_to_object.after(planet_selected).after(planet_orbit))
         .add_system(escape)
-        .add_system(escape_event);
+        .add_system(escape_event)
+        .add_system(fix_glitch);
 
-    #[cfg(debug_assertions)]
-    app.add_system(debug);
+    app.add_system_set(
+        SystemSet::new()
+            .with_run_criteria(bevy::time::FixedTimestep::step(1.0))
+            .with_system(debug),
+    );
 
     #[cfg(debug_assertions)]
     app.add_plugin(bevy_editor_pls::prelude::EditorPlugin);
@@ -104,33 +105,49 @@ fn setup(
     escape.send(EscapeEvent);
 
     // planets
-    macro_rules! planet {
+    macro_rules! object {
         ($name:ident) => {
-            planet!($name, StandardMaterial::default(), t)
+            object!($name, StandardMaterial::default(), t, true)
         };
-        ($name:ident, $material:expr, $texture:ident) => {{
-            let planet = Planet::$name;
+
+        ($name:ident, $color:expr) => {
+            object!(
+                $name,
+                StandardMaterial {
+                    base_color: $color,
+                    ..default()
+                },
+                t,
+                false
+            )
+        };
+
+        ($name:ident, $material:expr, $texture:ident, $has_texture:literal) => {{
+            let obj = SpaceObject::$name;
             let mesh = Mesh::from(shape::UVSphere {
-                radius: planet.scaled_radius(),
+                radius: dbg!(obj.scaled_radius()),
                 sectors: 64,
                 stacks: 64,
             });
 
-            let $texture =
-                asset_server.load(format!("planets/{}.jpg", stringify!($name).to_lowercase()));
+            let $texture = if $has_texture {
+                Some(asset_server.load(format!("{}.jpg", stringify!($name).to_lowercase())))
+            } else {
+                None
+            };
 
-            let mut planet_id = commands.spawn((
+            let mut obj_id = commands.spawn((
                 PbrBundle {
                     mesh: meshes.add(mesh),
                     material: materials.add(StandardMaterial {
-                        base_color_texture: Some($texture.clone()),
+                        base_color_texture: $texture.clone(),
                         // not reflective
                         reflectance: 0.0,
                         metallic: 0.0,
                         ..$material
                     }),
                     transform: {
-                        let mut t = Transform::from_xyz(planet.scaled_distance(), 0.0, 0.0);
+                        let mut t = Transform::from_xyz(dbg!(obj.scaled_distance()), 0.0, 0.0);
                         // flip the planet so it's not sideways
                         t.rotate_x(FRAC_PI_2);
                         t
@@ -139,19 +156,20 @@ fn setup(
                 },
                 PickableBundle::default(), // <- Makes the mesh pickable.
             ));
-            planet_id.insert(planet);
-            planet_id
+            obj_id.insert(obj);
+            obj_id
         }};
     }
 
-    planet!(
+    object!(
         Sun,
         StandardMaterial {
             emissive: Color::rgb_linear(255.0, 255.0, 255.0),
-            emissive_texture: Some(texture),
+            emissive_texture: texture,
             ..default()
         },
-        texture
+        texture,
+        true
     )
     .with_children(|children| {
         children.spawn(PointLightBundle {
@@ -166,32 +184,99 @@ fn setup(
         });
     });
 
-    planet!(Mercury);
-    planet!(Venus);
-    planet!(Earth);
-    planet!(Mars);
-    planet!(Jupiter);
-    planet!(Saturn);
-    planet!(Uranus);
-    planet!(Neptune);
+    object!(Mercury);
+    object!(Venus);
+
+    object!(Earth);
+    object!(EarthMoon);
+
+    object!(Mars);
+    object!(Phobos, Color::GRAY);
+    object!(Deimos, Color::GRAY);
+
+    object!(Jupiter);
+    object!(Io, Color::YELLOW_GREEN);
+    object!(Metis, Color::PINK);
+    object!(Adrastea, Color::GRAY);
+    object!(Amalthea, Color::GRAY);
+    object!(Thebe, Color::GRAY);
+
+    object!(Saturn);
+    object!(Enceladus, Color::WHITE);
+    object!(Mimas, Color::GRAY);
+    object!(Tethys, Color::WHITE);
+    object!(Dione, Color::WHITE);
+    object!(Rhea, Color::BISQUE);
+    object!(Titan, Color::ORANGE);
+
+    object!(Uranus);
+    object!(Miranda, Color::GRAY);
+    object!(Ariel, Color::WHITE);
+    object!(Umbriel, Color::GRAY);
+    object!(Titania, Color::BLUE);
+    object!(Oberon, Color::BLUE);
+
+    object!(Neptune);
+    object!(Triton, Color::PINK);
+    object!(Nereid, Color::GRAY);
+    object!(Proteus, Color::GRAY);
+    object!(Larissa, Color::GRAY);
+    object!(Halimede, Color::GRAY);
+
+    object!(Pluto);
+    object!(Charon, Color::GRAY);
+    object!(Nix, Color::GRAY);
+    object!(Hydra, Color::GRAY);
+    object!(Kerberos, Color::GRAY);
+    object!(Styx, Color::GRAY);
 }
 
-/// debug location of the camera and all planets
-#[cfg(debug_assertions)]
-fn debug(planets: Query<(&Planet, &Transform)>, camera: Query<&Transform, With<MainCamera>>) {
-    // print out the location of the camera and all planets
-    for (planet, transform) in planets.iter() {
-        info!("{planet:#?}: {:?}", transform.translation);
+/// fix the camera glitch where the camera gets flinged into oblivion
+/// this is caused by the camera's x and y coordinates being set to absurdly small numbers
+fn fix_glitch(mut camera: Query<(&mut Transform, &mut Smoother), With<MainCamera>>) {
+    for (mut transform, mut smooth) in camera.iter_mut() {
+        if transform.translation.x.abs() < 0.0001 {
+            transform.translation.x = 0.0;
+            smooth.reset();
+        }
+        if transform.translation.y.abs() < 0.0001 {
+            transform.translation.y = 0.0;
+            smooth.reset();
+        }
     }
+}
+
+/// debug location of the camera
+fn debug(camera: Query<&Transform, With<MainCamera>>) {
     for transform in camera.iter() {
         info!("Camera: {:?}", transform.translation);
     }
 }
 
-fn planet_orbit(time: Res<Time>, mut planets: Query<(&mut Transform, &Planet)>) {
-    for (mut transform, planet) in planets.iter_mut() {
+fn planet_orbit(time: Res<Time>, mut planet_q: Query<(&mut Transform, &SpaceObject)>) {
+    let mut main_planets = Vec::with_capacity(8);
+
+    for (mut transform, planet) in planet_q
+        .iter_mut()
+        .filter(|(_, p)| p.orbits() == SpaceObject::Sun)
+    {
         transform.translate_around(
             Vec3::ZERO,
+            Quat::from_rotation_y(planet.orbital_velocity() * time.delta_seconds()),
+        );
+        main_planets.push((*transform, *planet));
+    }
+    for (mut transform, planet, orbit) in planet_q.iter_mut().filter_map(|(t, p)| {
+        Some((
+            *t,
+            p,
+            main_planets
+                .iter()
+                .find_map(move |(_, p2)| if p.orbits() == *p2 { Some(*t) } else { None })?,
+        ))
+    }) {
+        transform.translate_around(
+            orbit.translation,
             Quat::from_rotation_y(planet.orbital_velocity() * time.delta_seconds()),
         );
     }
@@ -221,13 +306,11 @@ fn planet_selected(
     }
 }
 
-fn lock_to_planet(
-    planet: Query<(&Planet, &Transform), With<CurrentPlanet>>,
+fn lock_to_object(
+    planet: Query<(&SpaceObject, &Transform), With<CurrentPlanet>>,
     mut movement: EventWriter<MovementEvent>,
 ) {
     if let Ok((planet, Transform { translation, .. })) = planet.get_single() {
-        info!(?planet, "Locking to planet");
-
         movement.send(MovementEvent(LookTransform::new(
             *translation - Vec3::new(0.0, 0.0, planet.scaled_radius() * 3.0),
             *translation,
@@ -252,12 +335,11 @@ fn escape_event(
     events.clear();
 
     movement.send(MovementEvent(LookTransform::new(
-        Vec3::new(0.0, 100_000.0, 0.0),
+        Vec3::new(0.0, 1000.0, 0.0),
         Vec3::ZERO,
         Vec3::Y,
     )));
 
-    info!("Camera reset");
     if let Ok(planet) = planet.get_single_mut() {
         commands.entity(planet).remove::<CurrentPlanet>();
     }
@@ -273,7 +355,5 @@ fn movement_event(
         let mut camera = cameras.single_mut();
 
         *camera = event.0;
-
-        info!(translate = ?event.0, "Camera moved");
     }
 }
