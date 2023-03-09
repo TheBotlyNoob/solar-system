@@ -61,7 +61,8 @@ fn main() {
     app.add_system(object_selected)
         .add_system(planet_orbit)
         .add_system(lock_to_object.after(object_selected).after(planet_orbit))
-        .add_system(escape);
+        .add_system(escape.after(object_selected))
+        .add_system(reset_camera.after(escape).after(lock_to_object));
 
     app.add_system_set(
         SystemSet::new()
@@ -281,18 +282,27 @@ fn escape(
     mut commands: Commands,
     current_planet: Query<Entity, With<CurrentObject>>,
     kbd: ResMut<Input<KeyCode>>,
-    mut rig: Query<&mut Rig>,
 ) {
     if kbd.just_pressed(KeyCode::Escape) {
         info!("Escape pressed");
 
-        let mut rig = rig.single_mut();
-        rig.driver_mut::<LookAt>().target = glam::Vec3::ZERO;
-        rig.driver_mut::<Position>().position = DEFAULT_CAMERA_POSITION;
-
         if let Ok(planet) = current_planet.get_single() {
             commands.entity(planet).remove::<CurrentObject>();
         }
+    }
+}
+
+fn reset_camera(
+    no_planet: Query<Entity, With<CurrentObject>>,
+    mut cam: Query<&mut Transform, With<MainCamera>>,
+) {
+    if no_planet.is_empty() {
+        *cam.single_mut() = Transform::from_xyz(
+            DEFAULT_CAMERA_POSITION.x,
+            DEFAULT_CAMERA_POSITION.y,
+            DEFAULT_CAMERA_POSITION.z,
+        )
+        .looking_at(Vec3::ZERO, Vec3::Y);
     }
 }
 
