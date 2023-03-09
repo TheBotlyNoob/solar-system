@@ -4,14 +4,14 @@ A basic solar system simulation using Rust and Bevy. It is not entirely to scale
 
 ## Features
 
--   [x] Sun
--   [x] Add planets
--   [ ] Add moons
--   [ ] Add space missions
+- [x] Sun
+- [x] Add planets
+- [ ] Add moons
+- [ ] Add space missions
 
--   [x] Add textures
--   [ ] Add rings
--   [ ] Add asteroids
+- [x] Add textures
+- [ ] Add rings
+- [ ] Add asteroids
 
--   [x] Accurate orbital mechanics
--   [ ] Accurate scale - not planned
+- [x] Accurate orbital mechanics
+- [ ] Accurate scale - not planned
