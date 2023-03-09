@@ -15,6 +15,8 @@ use space::SpaceObject;
 
 mod space;
 
+const DEFAULT_CAMERA_POSITION: glam::Vec3 = glam::Vec3::new(0.0, 100.0, 100_000.0);
+
 #[derive(Component)]
 struct CurrentObject;
 
@@ -26,8 +28,7 @@ fn main() {
         .insert_resource(AmbientLight {
             brightness: 0.5, // represents the brightness of stars around the solar system
             ..Default::default()
-        })
-        .add_event::<EscapeEvent>();
+        });
 
     #[cfg(target_arch = "wasm32")]
     app.insert_resource(Msaa { samples: 1 });
@@ -60,8 +61,7 @@ fn main() {
     app.add_system(object_selected)
         .add_system(planet_orbit)
         .add_system(lock_to_object.after(object_selected).after(planet_orbit))
-        .add_system(escape)
-        .add_system(escape_event);
+        .add_system(escape);
 
     app.add_system_set(
         SystemSet::new()
@@ -83,12 +83,11 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut escape: EventWriter<EscapeEvent>,
 ) {
     commands.spawn((
         MainCamera,
         Rig::builder()
-            .with(Position::new(glam::Vec3::ZERO))
+            .with(Position::new(DEFAULT_CAMERA_POSITION))
             .with(Smooth::new_position(1.0).predictive(true))
             .with(Smooth::new_position(2.5))
             .with(
@@ -98,8 +97,6 @@ fn setup(
             )
             .build(),
     ));
-
-    escape.send(EscapeEvent);
 
     commands.spawn((
         MainCamera,
@@ -280,10 +277,22 @@ fn planet_orbit(time: Res<Time>, mut planet_q: Query<(&mut Transform, &SpaceObje
     // }
 }
 
-fn escape(kbd: ResMut<Input<KeyCode>>, mut events: EventWriter<EscapeEvent>) {
+fn escape(
+    mut commands: Commands,
+    current_planet: Query<Entity, With<CurrentObject>>,
+    kbd: ResMut<Input<KeyCode>>,
+    mut rig: Query<&mut Rig>,
+) {
     if kbd.just_pressed(KeyCode::Escape) {
         info!("Escape pressed");
-        events.send(EscapeEvent);
+
+        let mut rig = rig.single_mut();
+        rig.driver_mut::<LookAt>().target = glam::Vec3::ZERO;
+        rig.driver_mut::<Position>().position = DEFAULT_CAMERA_POSITION;
+
+        if let Ok(planet) = current_planet.get_single() {
+            commands.entity(planet).remove::<CurrentObject>();
+        }
     }
 }
 
@@ -311,29 +320,12 @@ fn lock_to_object(
     if let Ok((planet, transform)) = planet.get_single() {
         let mut rig = rig.single_mut();
         rig.driver_mut::<LookAt>().target = transform.transform_2_dolly().position;
-        rig.driver_mut::<Position>().position =
-            transform.transform_2_dolly().position + (glam::Vec3::Z * planet.scaled_radius() * 3.0);
-    }
-}
+        let mut cam_pos = glam::Vec3::Z * planet.scaled_radius() * 3.0;
 
-/// An event that makes the camera look at the whole solar system.
-struct EscapeEvent;
+        if transform.translation.z < 0.0 {
+            cam_pos.z = -cam_pos.z;
+        }
 
-fn escape_event(
-    mut commands: Commands,
-    events: EventReader<EscapeEvent>,
-    mut cam: Query<&mut Transform, With<MainCamera>>,
-    mut obj: Query<Entity, With<CurrentObject>>,
-) {
-    if events.is_empty() {
-        return;
-    }
-
-    events.clear();
-
-    *cam.single_mut() = Transform::from_xyz(0.0, 100_000.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y);
-
-    if let Ok(planet) = obj.get_single_mut() {
-        commands.entity(planet).remove::<CurrentObject>();
+        rig.driver_mut::<Position>().position = transform.transform_2_dolly().position + cam_pos;
     }
 }
