@@ -5,6 +5,10 @@ use bevy::{
     prelude::*,
 };
 use bevy_dolly::{dolly::glam, prelude::*};
+use bevy_egui::{
+    egui::{self, RichText},
+    EguiContext, EguiPlugin,
+};
 use bevy_embedded_assets::EmbeddedAssetPlugin;
 use bevy_framepace::FramepacePlugin;
 use bevy_mod_picking::{
@@ -52,7 +56,8 @@ fn main() {
 
     app.add_plugin(PickingPlugin)
         .add_plugin(InteractablePickingPlugin)
-        .add_plugin(FramepacePlugin);
+        .add_plugin(FramepacePlugin)
+        .add_plugin(EguiPlugin);
 
     app.add_dolly_component(MainCamera);
 
@@ -64,20 +69,98 @@ fn main() {
         .add_system(escape.after(object_selected))
         .add_system(reset_camera.after(escape).after(lock_to_object));
 
-    app.add_system_set(
-        SystemSet::new()
-            .with_run_criteria(bevy::time::FixedTimestep::step(1.0))
-            .with_system(debug_objects),
-    );
-
-    #[cfg(debug_assertions)]
-    app.add_plugin(bevy_editor_pls::prelude::EditorPlugin);
+    app.add_system(main_ui).add_system(obj_info_ui);
 
     app.run()
 }
 
 #[derive(Component)]
 struct MainCamera;
+
+fn main_ui(
+    mut commands: Commands,
+    mut egui_ctx: ResMut<EguiContext>,
+    objs: Query<(Entity, &SpaceObject)>,
+) {
+    egui::Window::new("Solar System")
+        .default_width(300.0)
+        .show(egui_ctx.ctx_mut(), |ui| {
+            ui.label(RichText::new("The Solar System").size(20.0));
+
+            ui.separator();
+
+            ui.label("Click on a planet to zoom in and get more information on it.");
+            ui.label("You can click both the planet in the simulation and the planet in the list to zoom in.");
+            ui.separator();
+            ui.label("Press 'Esc' to reset the camera.");
+            ui.separator();
+            egui::Grid::new("planets").show(ui, |ui| {
+            for obj in enum_iterator::all::<SpaceObject>() {
+                if obj.orbits() == SpaceObject::Sun {
+                    ui.end_row();
+                }
+
+                if ui.small_button(obj.name()).clicked() {
+                    for (entity, &other_obj) in objs.iter() {
+                        let mut entity = commands.entity(entity);
+
+                        if other_obj == obj {
+                           entity.insert(CurrentObject);
+                        } else {
+                            entity.remove::<CurrentObject>();
+                        }
+                    }
+                }
+            }});
+        });
+}
+
+fn scientific_notation(num: f32) -> String {
+    let mut num = num;
+    let mut exp = 0;
+
+    while num >= 10.0 {
+        num /= 10.0;
+        exp += 1;
+    }
+
+    while num < 1.0 {
+        num *= 10.0;
+        exp -= 1;
+    }
+
+    format!("{num}x10^{exp}")
+}
+
+fn obj_info_ui(mut egui_ctx: ResMut<EguiContext>, obj: Query<&SpaceObject, With<CurrentObject>>) {
+    if let Ok(obj) = obj.get_single() {
+        egui::Window::new(obj.name())
+            .default_width(300.0)
+            .show(egui_ctx.ctx_mut(), |ui| {
+                ui.label(obj.name());
+                ui.separator();
+                ui.label(format!("Mass: {} kg", scientific_notation(obj.mass())));
+                ui.label(format!("Diameter: {} km", obj.radius() * 2.0));
+                ui.label(format!(
+                    "Distance from what it orbits: {} AU",
+                    obj.distance()
+                ));
+                ui.label(format!("Number of moons: {}", obj.num_moons()));
+                ui.label(format!("Average temperature: {}°C", obj.temperature()));
+                ui.label(format!(
+                    "Period of revolution: {} days",
+                    obj.period_of_revolution()
+                ));
+                ui.label(format!(
+                    "Period of rotation: {} days",
+                    obj.period_of_rotation()
+                ));
+                ui.label(format!("Orbits: {}", obj.orbits().name()));
+                ui.separator();
+                ui.label(format!("Fun fact: {}", obj.fun_fact()));
+            });
+    }
+}
 
 fn setup(
     mut commands: Commands,
@@ -236,19 +319,6 @@ fn setup(
     object!(Styx, Color::GRAY);
 }
 
-/// debugs the position of the camera and selected planet
-fn debug_objects(
-    camera: Query<&Transform, With<MainCamera>>,
-    selected: Query<&Transform, With<CurrentObject>>,
-) {
-    for camera in camera.iter() {
-        info!(?camera);
-    }
-    for current_obj in selected.iter() {
-        info!(?current_obj);
-    }
-}
-
 fn planet_orbit(time: Res<Time>, mut planet_q: Query<(&mut Transform, &SpaceObject)>) {
     let mut main_planets = Vec::with_capacity(8);
 
@@ -262,31 +332,35 @@ fn planet_orbit(time: Res<Time>, mut planet_q: Query<(&mut Transform, &SpaceObje
         );
         main_planets.push((*transform, *planet));
     }
-    // for (mut transform, planet, orbit) in planet_q.iter_mut().filter_map(|(t, p)| {
-    //     Some((
-    //         *t,
-    //         p,
-    //         main_planets
-    //             .iter()
-    //             .find_map(move |(_, p2)| if p.orbits() == *p2 { Some(*t) } else { None })?,
-    //     ))
-    // }) {
-    //     transform.translate_around(
-    //         orbit.translation,
-    //         Quat::from_rotation_y(planet.orbital_velocity() * time.delta_seconds()),
-    //     );
-    // }
+    for (mut transform, planet, orbit) in planet_q
+        .iter_mut()
+        .filter(|(_, &o)| o != SpaceObject::Sun)
+        .filter_map(|(t, p)| {
+            Some((
+                *t,
+                p,
+                main_planets
+                    .iter()
+                    .find_map(|(_, orbit)| if p.orbits() == *orbit { Some(*t) } else { None })?,
+            ))
+        })
+    {
+        transform.translate_around(
+            orbit.translation,
+            Quat::from_rotation_y(planet.orbital_velocity() * time.delta_seconds()),
+        );
+    }
 }
 
 fn escape(
     mut commands: Commands,
-    current_planet: Query<Entity, With<CurrentObject>>,
+    obj: Query<Entity, With<CurrentObject>>,
     kbd: ResMut<Input<KeyCode>>,
 ) {
     if kbd.just_pressed(KeyCode::Escape) {
         info!("Escape pressed");
 
-        if let Ok(planet) = current_planet.get_single() {
+        if let Ok(planet) = obj.get_single() {
             commands.entity(planet).remove::<CurrentObject>();
         }
     }

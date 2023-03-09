@@ -59,14 +59,14 @@ impl SpaceObject {
     /// The name of the object.
     pub fn name(self) -> &'static str {
         match self {
-            Self::Sun => "Sun",
+            Self::Sun => "The Sun",
 
             Self::Mercury => "Mercury",
 
             Self::Venus => "Venus",
 
             Self::Earth => "Earth",
-            Self::EarthMoon => "Moon",
+            Self::EarthMoon => "The Moon",
 
             Self::Mars => "Mars",
             Self::Phobos => "Phobos",
@@ -338,6 +338,26 @@ impl SpaceObject {
         }
     }
 
+    /// Returns a constant fun fact about the given [`SpaceObject`].
+    pub fn fun_fact(&self) -> &'static str {
+        match self {
+            SpaceObject::Sun => "The Sun is so big that about 1.3 million Earths could fit inside it!",
+            SpaceObject::Mercury => "Mercury is the smallest planet in the Solar System, and it also has the most craters!",
+            SpaceObject::Venus => "Venus is the hottest planet in the Solar System, with surface temperatures that can melt lead!",
+            SpaceObject::Earth => "Earth is the only planet known to have liquid water on its surface, and it's also the only planet known to support life!",
+            SpaceObject::EarthMoon => "The Moon is moving away from Earth at around 3.8 cm per year!",
+            SpaceObject::Mars => "Mars is often called the \"Red Planet\" because of its reddish appearance, caused by iron oxide or rust on its surface!",
+            SpaceObject::Phobos => "Phobos is the larger of Mars' two moons, and it's so close to the planet that it will eventually be torn apart by tidal forces!",
+            SpaceObject::Deimos => "Deimos is the smaller of Mars' two moons, and it's named after the Greek god of terror!",
+            SpaceObject::Jupiter => "Jupiter is the largest planet in the Solar System, and it also has the strongest magnetic field of any planet!",
+            SpaceObject::Io => "Io is one of Jupiter's four largest moons, and it's the most volcanically active object in the Solar System!",
+            SpaceObject::Saturn => "Saturn is famous for its beautiful rings, which are made up of ice and rock particles ranging in size from tiny grains to massive chunks!",
+            SpaceObject::Uranus => "Uranus is the only planet in the Solar System that rotates on its side, with its north and south poles pointing almost directly at the Sun!",
+            SpaceObject::Neptune => "Neptune is the farthest planet from the Sun, and it has the strongest winds of any planet in the Solar System, with gusts that can reach up to 1,200 miles per hour!",
+            _ => "Sorry, no fun fact available for this planet yet!",
+        }
+    }
+
     /// The scale of the planet relative to the Sun.
     /// The Sun has a radius of 695,700 km.
     pub fn scaled_radius(self) -> f32 {
@@ -351,5 +371,132 @@ impl SpaceObject {
     /// The distance from the Sun.
     pub fn scaled_distance(self) -> f32 {
         self.distance() * (Self::Sun.radius() / 10.0)
+    }
+
+    // basic information to display on the planet info screen
+
+    /// The number of moons orbiting this planet.
+    /// The Sun has no moons.
+    pub fn num_moons(self) -> usize {
+        match self {
+            Self::Sun => 0,
+            Self::Mercury => 0,
+            Self::Venus => 0,
+            Self::Earth => 1,
+            Self::Mars => 2,
+            Self::Jupiter => 79,
+            Self::Saturn => 62,
+            Self::Uranus => 27,
+            Self::Neptune => 14,
+            Self::Pluto => 5,
+            _ => 0,
+        }
+    }
+
+    /// The average temperature of the planet in Celsius.
+    pub fn temperature(self) -> f32 {
+        match self {
+            Self::Sun => 5778.0,
+            Self::Mercury => 167.0,
+            Self::Venus => 464.0,
+            Self::Earth => 15.0,
+            Self::EarthMoon => -20.0,
+            Self::Mars => -63.0,
+            Self::Phobos => -58.0,
+            Self::Deimos => -40.0,
+            Self::Jupiter => -108.0,
+            Self::Metis => -100.0,
+            Self::Adrastea => -100.0,
+            Self::Amalthea => -100.0,
+            Self::Thebe => -100.0,
+            Self::Io => -143.0,
+            Self::Saturn => -139.0,
+            Self::Enceladus => -198.0,
+            Self::Mimas => -201.0,
+            Self::Tethys => -187.0,
+            Self::Dione => -186.0,
+            Self::Rhea => -196.0,
+            Self::Titan => -179.0,
+            Self::Uranus => -197.0,
+            Self::Miranda => -187.0,
+            Self::Ariel => -191.0,
+            Self::Umbriel => -200.0,
+            Self::Titania => -195.0,
+            Self::Oberon => -197.0,
+            Self::Neptune => -201.0,
+            Self::Triton => -235.0,
+            Self::Nereid => -220.0,
+            Self::Proteus => -200.0,
+            Self::Larissa => -197.0,
+            Self::Halimede => -215.0,
+            Self::Pluto => -229.0,
+            Self::Charon => -229.0,
+            Self::Nix => -230.0,
+            Self::Hydra => -232.0,
+            Self::Kerberos => -233.0,
+            Self::Styx => -233.0,
+        }
+    }
+
+    /// The period of revolution around the Sun in Earth days.
+    /// The Sun has no period of revolution.
+    pub fn period_of_revolution(self) -> f32 {
+        match self {
+            Self::Mercury => 88.0,
+            Self::Venus => 225.0,
+            Self::Earth => 365.0,
+            Self::Mars => 687.0,
+            Self::Jupiter => 4333.0,
+            Self::Saturn => 10759.0,
+            Self::Uranus => 30687.0,
+            Self::Neptune => 60190.0,
+            Self::Pluto => 90560.0,
+            _ => 0.0,
+        }
+    }
+
+    /// The period of rotation in Earth days.
+    pub fn period_of_rotation(self) -> f32 {
+        match self {
+            Self::Sun => 25.38,
+            Self::Mercury => 58.65,
+            Self::Venus => 243.02,
+            Self::Earth => 1.00,
+            Self::EarthMoon => 27.32,
+            Self::Mars => 1.03,
+            Self::Phobos => 0.32,
+            Self::Deimos => 1.26,
+            Self::Jupiter => 0.41,
+            Self::Metis => 0.30,
+            Self::Adrastea => 0.30,
+            Self::Amalthea => 0.50,
+            Self::Thebe => 0.67,
+            Self::Io => 1.77,
+            Self::Saturn => 0.44,
+            Self::Mimas => 0.94,
+            Self::Enceladus => 1.37,
+            Self::Tethys => 1.89,
+            Self::Dione => 2.74,
+            Self::Rhea => 4.52,
+            Self::Titan => 15.95,
+            Self::Uranus => 0.72,
+            Self::Miranda => 1.41,
+            Self::Ariel => 2.52,
+            Self::Umbriel => 4.14,
+            Self::Titania => 8.71,
+            Self::Oberon => 13.46,
+            Self::Neptune => 0.67,
+            Self::Triton => -5.88,
+            Self::Nereid => 360.13,
+            Self::Proteus => 1.12,
+            Self::Larissa => 0.55,
+            Self::Halimede => 0.43,
+            Self::Pluto => 6.39,
+            Self::Charon => 6.39,
+            Self::Nix => 1.83,
+            Self::Hydra => 1.38,
+            Self::Kerberos => 5.31,
+            Self::Styx => 20.16,
+        }
     }
 }
