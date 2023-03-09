@@ -1,13 +1,12 @@
 #![warn(clippy::all)]
 
-use std::f32::consts::FRAC_PI_2;
-
 use bevy::{
     core_pipeline::fxaa::{Fxaa, Sensitivity},
     prelude::*,
 };
-use bevy_dolly::prelude::*;
+use bevy_dolly::{dolly::glam, prelude::*};
 use bevy_embedded_assets::EmbeddedAssetPlugin;
+use bevy_framepace::FramepacePlugin;
 use bevy_mod_picking::{
     InteractablePickingPlugin, PickableBundle, PickingCameraBundle, PickingEvent, PickingPlugin,
     SelectionEvent,
@@ -51,7 +50,8 @@ fn main() {
     );
 
     app.add_plugin(PickingPlugin)
-        .add_plugin(InteractablePickingPlugin);
+        .add_plugin(InteractablePickingPlugin)
+        .add_plugin(FramepacePlugin);
 
     app.add_dolly_component(MainCamera);
 
@@ -66,7 +66,7 @@ fn main() {
     app.add_system_set(
         SystemSet::new()
             .with_run_criteria(bevy::time::FixedTimestep::step(1.0))
-            .with_system(debug),
+            .with_system(debug_objects),
     );
 
     #[cfg(debug_assertions)]
@@ -83,15 +83,23 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut escape: EventWriter<EscapeEvent>,
 ) {
     commands.spawn((
         MainCamera,
         Rig::builder()
-            .with(Position::new(Vec3::Y * 100_000.0))
-            .with(MovableLookAt::from_position_target(Vec3::ZERO))
-            .with(Smooth::new_position_rotation(0.8, 0.6))
+            .with(Position::new(glam::Vec3::ZERO))
+            .with(Smooth::new_position(1.0).predictive(true))
+            .with(Smooth::new_position(2.5))
+            .with(
+                LookAt::new(glam::Vec3::ZERO)
+                    .tracking_smoothness(1.25)
+                    .tracking_predictive(true),
+            )
             .build(),
     ));
+
+    escape.send(EscapeEvent);
 
     commands.spawn((
         MainCamera,
@@ -148,7 +156,7 @@ fn setup(
                     transform: {
                         let mut t = Transform::from_xyz(obj.scaled_distance(), 0.0, 0.0);
                         // flip the planet so it's not sideways
-                        t.rotate_x(FRAC_PI_2);
+                        t.rotate_x(90.0_f32.to_radians());
                         t
                     },
                     ..default()
@@ -230,10 +238,16 @@ fn setup(
     object!(Styx, Color::GRAY);
 }
 
-/// debug location of the camera
-fn debug(camera: Query<&Transform, With<MainCamera>>) {
-    for transform in camera.iter() {
-        info!("Camera: {:?}", transform.translation);
+/// debugs the position of the camera and selected planet
+fn debug_objects(
+    camera: Query<&Transform, With<MainCamera>>,
+    selected: Query<&Transform, With<CurrentObject>>,
+) {
+    for camera in camera.iter() {
+        info!(?camera);
+    }
+    for current_obj in selected.iter() {
+        info!(?current_obj);
     }
 }
 
@@ -250,20 +264,20 @@ fn planet_orbit(time: Res<Time>, mut planet_q: Query<(&mut Transform, &SpaceObje
         );
         main_planets.push((*transform, *planet));
     }
-    for (mut transform, planet, orbit) in planet_q.iter_mut().filter_map(|(t, p)| {
-        Some((
-            *t,
-            p,
-            main_planets
-                .iter()
-                .find_map(move |(_, p2)| if p.orbits() == *p2 { Some(*t) } else { None })?,
-        ))
-    }) {
-        transform.translate_around(
-            orbit.translation,
-            Quat::from_rotation_y(planet.orbital_velocity() * time.delta_seconds()),
-        );
-    }
+    // for (mut transform, planet, orbit) in planet_q.iter_mut().filter_map(|(t, p)| {
+    //     Some((
+    //         *t,
+    //         p,
+    //         main_planets
+    //             .iter()
+    //             .find_map(move |(_, p2)| if p.orbits() == *p2 { Some(*t) } else { None })?,
+    //     ))
+    // }) {
+    //     transform.translate_around(
+    //         orbit.translation,
+    //         Quat::from_rotation_y(planet.orbital_velocity() * time.delta_seconds()),
+    //     );
+    // }
 }
 
 fn escape(kbd: ResMut<Input<KeyCode>>, mut events: EventWriter<EscapeEvent>) {
@@ -294,10 +308,11 @@ fn lock_to_object(
     planet: Query<(&SpaceObject, &Transform), With<CurrentObject>>,
     mut rig: Query<&mut Rig>,
 ) {
-    if let Ok((planet, Transform { translation, .. })) = planet.get_single() {
-        rig.single_mut()
-            .driver_mut::<MovableLookAt>()
-            .set_position_target(*translation, Quat::IDENTITY);
+    if let Ok((planet, transform)) = planet.get_single() {
+        let mut rig = rig.single_mut();
+        rig.driver_mut::<LookAt>().target = transform.transform_2_dolly().position;
+        rig.driver_mut::<Position>().position =
+            transform.transform_2_dolly().position + (glam::Vec3::Z * planet.scaled_radius() * 3.0);
     }
 }
 
@@ -307,7 +322,7 @@ struct EscapeEvent;
 fn escape_event(
     mut commands: Commands,
     events: EventReader<EscapeEvent>,
-    mut rig: Query<&mut Rig>,
+    mut cam: Query<&mut Transform, With<MainCamera>>,
     mut obj: Query<Entity, With<CurrentObject>>,
 ) {
     if events.is_empty() {
@@ -316,9 +331,7 @@ fn escape_event(
 
     events.clear();
 
-    rig.single_mut()
-        .driver_mut::<MovableLookAt>()
-        .set_position_target(Vec3::ZERO, Quat::from_rotation_y(FRAC_PI_2));
+    *cam.single_mut() = Transform::from_xyz(0.0, 100_000.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y);
 
     if let Ok(planet) = obj.get_single_mut() {
         commands.entity(planet).remove::<CurrentObject>();

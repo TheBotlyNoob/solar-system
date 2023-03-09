@@ -4,7 +4,7 @@ const ASTRO_UNIT: f32 = 149_597_870.7;
 
 const GRAV: f32 = 6.674_08e-11;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Component)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Component, enum_iterator::Sequence)]
 /// Space objects, including moons (a max of 5 per planet), planets, and the Sun.
 pub enum SpaceObject {
     Sun,
@@ -56,6 +56,60 @@ pub enum SpaceObject {
 }
 
 impl SpaceObject {
+    /// The name of the object.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Sun => "Sun",
+
+            Self::Mercury => "Mercury",
+
+            Self::Venus => "Venus",
+
+            Self::Earth => "Earth",
+            Self::EarthMoon => "Moon",
+
+            Self::Mars => "Mars",
+            Self::Phobos => "Phobos",
+            Self::Deimos => "Deimos",
+
+            Self::Jupiter => "Jupiter",
+            Self::Metis => "Metis",
+            Self::Adrastea => "Adrastea",
+            Self::Amalthea => "Amalthea",
+            Self::Thebe => "Thebe",
+            Self::Io => "Io",
+
+            Self::Saturn => "Saturn",
+            Self::Enceladus => "Enceladus",
+            Self::Mimas => "Mimas",
+            Self::Tethys => "Tethys",
+            Self::Dione => "Dione",
+            Self::Rhea => "Rhea",
+            Self::Titan => "Titan",
+
+            Self::Uranus => "Uranus",
+            Self::Miranda => "Miranda",
+            Self::Ariel => "Ariel",
+            Self::Umbriel => "Umbriel",
+            Self::Titania => "Titania",
+            Self::Oberon => "Oberon",
+
+            Self::Neptune => "Neptune",
+            Self::Triton => "Triton",
+            Self::Nereid => "Nereid",
+            Self::Proteus => "Proteus",
+            Self::Larissa => "Larissa",
+            Self::Halimede => "Halimede",
+
+            Self::Pluto => "Pluto",
+            Self::Charon => "Charon",
+            Self::Nix => "Nix",
+            Self::Hydra => "Hydra",
+            Self::Kerberos => "Kerberos",
+            Self::Styx => "Styx",
+        }
+    }
+
     /// The radius of the planet in kilometers.
     pub fn radius(self) -> f32 {
         match self {
